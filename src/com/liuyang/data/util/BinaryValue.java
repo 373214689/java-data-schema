@@ -57,6 +57,11 @@ public final class BinaryValue extends PrimitveValue{
     }
     
     @Override
+    public final int length() {
+    	return value.length;
+    }
+    
+    @Override
     public final void setValue(byte[] value) {
     	this.value = value;
     }

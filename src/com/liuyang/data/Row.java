@@ -13,9 +13,10 @@ import com.liuyang.data.util.FloatValue;
 import com.liuyang.data.util.IntValue;
 import com.liuyang.data.util.LongValue;
 import com.liuyang.data.util.PrimitveValue;
-import com.liuyang.data.util.Schema;
+
 import com.liuyang.data.util.ShortValue;
 import com.liuyang.data.util.TextValue;
+import com.liuyang.data.util.Schema;
 import com.liuyang.data.util.Schema.Type;
 
 public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
@@ -31,13 +32,16 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
 			} else {
 				word = "";
 			}
-        	retval.parsePrimitveValue(i, word);
+        	retval.parseStringValue(i, word);
     	}
     	word = null;
     	return retval;
 	}
 	
     private int size = 0;
+    
+    /** 调用groupby时，会将指定的字段存入keys中，而将其余字段存入values。*/
+    private Row keys = null;
 	
     private PrimitveValue[] values;
     
@@ -52,7 +56,7 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
     	this.size = schema.getType() == Schema.Type.STRUCT ? schema.getChildren().size() : 1;
     	values = new PrimitveValue[size];
     	if (bInit) {
-    		UDF.range(0, size).forEach(i -> {
+    		UDF.range(0, size, 1, false).forEach(i -> {
     			switch (schema.getType(i)) {
     			case BINARY:
     				values[i] = new BinaryValue() ; break;
@@ -107,6 +111,13 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
     	return indexOf(o) >= 0;
     }
     
+    public final boolean containsAll(Row other) {
+    	for(int i = 0; i < other.size(); i++) {
+    		if (indexOf(other.get(i)) == -1) return false;
+    	}
+    	return true;
+    }
+    
     @Override
     public final Row clone() {
     	Row retval = new Row();
@@ -121,10 +132,23 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
 		if (anObject == null) return false;
 		if (anObject instanceof Row) {
 			Row other = (Row) anObject;
+			//System.out.println("row equals schema compare " + schema + " == " + other.schema + " >> " + schema.equals(other.schema));
 			if (!schema.equals(other.schema)) return false;
-			return stream().filter(a -> other.contains(a)).count() == size;
+			int length = size();
+			int count = (int) stream().filter(a -> other.contains(a)).count();
+			//System.out.println("row equals data compare  " + length + " >> " + count);
+			return count == length;
 		}
     	return false;
+    }
+    
+    public final Row fill(Object[] datas) {
+    	if (datas == null) return this;
+    	int length = size > values.length ? size : values.length;
+    	for(int i = 0; i < length; i++) {
+    		updateValue(i, datas[i]);
+    	}
+    	return this;
     }
     
     /**
@@ -254,12 +278,23 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
     	return String.valueOf(values[index]);
     }
     
+    public final Row groupby(String... fieldNames) {
+    	if (fieldNames == null) return this;
+    	if (fieldNames.length == 0) return this;
+    	if ("*".equals(fieldNames[0])) return this;
+    	//String[] valuesField = schema.getChildren().stream().filter(e -> Arrays.asList(fieldNames).contains(e)).toArray(n -> new String[n]);
+    	Row retval = new Row();
+    	retval.schema = schema;
+    	retval.keys = select(fieldNames);
+    	retval.values = values;
+    	return retval;
+    }
 
     @Override
     public final int hashCode() {
     	if (schema.getType() == Type.STRUCT) {
-    		int result = 0;
-    		for(int i = 0; i < size; i++) {
+    		int result = 1987;
+    		for(int i = 0, length = size(); i < length; i++) {
     	          result = result * 31 + values[i].hashCode();
     	    }
     		return result;
@@ -278,16 +313,24 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
      */
     public final int indexOf(Object o) {
         if (o == null) {
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size(); i++)
                 if (values[i]==null)
                     return i;
         } else {
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < size(); i++)
                 if (o.equals(values[i]))
                     return i;
         }
         return -1;
     }
+    
+    public final Row keys() {
+    	return keys;
+    }
+    
+    //public final int length() {
+    	
+    //}
     
     /**
      * Returns the index of the last occurrence of the specified element
@@ -361,7 +404,7 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
 			} else {
 				word = "";
 			}
-        	parsePrimitveValue(i, word);
+        	parseStringValue(i, word);
     	}
     	//System.out.println(this);
     	word = null;
@@ -369,12 +412,12 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
     }
     
     /**
-     * Parse the value of primitve types.
+     * Parse string as the value of primitve types.
      * @param index
      * @param value
      * @return
      */
-    public final Row parsePrimitveValue(int index, String value) {
+    public final Row parseStringValue(int index, String value) {
     	Type type = schema.getType(index);
     	switch(type) {
     	case BINARY: {
@@ -410,6 +453,64 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
     	}
     	default:
     		return updateValue(index, value);
+    	}
+    }
+    
+    /**
+     * Parse object as the value of primitve types.
+     * 
+     * @param index
+     * @param value
+     * @return
+     */
+    public final Row parseObjectValue(int index, Object value) {
+    	Type type = schema.getType(index);
+    	switch(type) {
+    	case BINARY: {
+    		if (!(value instanceof byte[])) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: " + value + ", type is not byte[].");
+    		return updateValue(index, (byte[]) value);
+    	}
+    	case BOOLEAN: {
+    		if (!(value instanceof Boolean)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: " + value + ", type is not boolean.");
+    		return updateValue(index, (boolean) value);
+    	}
+    	case DOUBLE: {
+    		if (!(value instanceof Double)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]: " + value + ", type is not double.");
+    		return updateValue(index, (double) value);
+    	}
+    	case FLOAT: {
+    		if (!(value instanceof Float)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: " + value + ", type is not float.");
+    		return updateValue(index, (float) value);
+    	}
+    	case INT:
+    	case INTEGER: {
+    		if (!(value instanceof Integer)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: " + value + ", type is not integer.");
+    		return updateValue(index, (int) value);
+    	}
+    	case BIGINT:
+    	case LONG: {
+    		if (!(value instanceof Long)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: " + value + ", type is not long.");
+    		return updateValue(index, (long) value);
+    	}
+    	case SMALLINT:
+    	case SHORT: {
+    		if (!(value instanceof Short)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: "+ value + ", type is not short.");
+    		return updateValue(index, (short) value);
+    	}
+    	case STRING: {
+    		if (!(value instanceof String)) 
+    			throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: "+ value + ", type is not string.");
+    		return updateValue(index, (String) value);
+    	}
+    	default:
+    		throw new IllegalArgumentException("Illegal paramater[" + index + "]<" + type + ">: " + value + ", type is undefined.");
     	}
     }
     
@@ -626,9 +727,13 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
     
     @Override
     public final String toString() {
-    	return "[" + String.join(",", stream().map(e -> e.toString()).toArray(n -> new String[n])) + "]";
+    	return (keys != null ? keys + ": " : "") + "[" + String.join(",", stream().map(e -> e.toString()).toArray(n -> new String[n])) + "]";
     }
 
+    public final Object[] toArray() {
+    	return Arrays.stream(values).map(e -> e.getValue()).toArray();
+    }
+    
 	@Override
 	public final Iterator<PrimitveValue> iterator() {
 		return Arrays.asList(values).iterator();
@@ -720,6 +825,17 @@ public final class Row implements Iterable<PrimitveValue>, Comparable<Row> {
         	values[index].updateValue(newValue);
     	}
     	return this;
+	}
+	
+	public final Row updateValue(int index, Object newValue) {
+		return parseObjectValue(index, newValue);
+	}
+	
+	public final Row values() {
+		Row retval = new Row();
+		retval.schema = schema;
+		retval.values = values;
+		return retval;
 	}
 
     

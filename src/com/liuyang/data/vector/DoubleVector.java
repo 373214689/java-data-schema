@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,20 +19,24 @@ public final class DoubleVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<DoubleValue> values;
+	private List<Double> values;
 
 	public DoubleVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<DoubleValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<Double>(initSize));
 	}
 	
 	public DoubleVector(Schema schema) {
 		this(schema, 1);
 	}
 	
+	private DoubleVector() {
+
+	}
+
 	@Override
 	protected void finalize() {
 		values.clear();
@@ -56,39 +61,56 @@ public final class DoubleVector extends PrimitveVector {
     
 	@Override
 	public DoubleVector append(double value) {
-		values.add(new DoubleValue(value));
+		values.add(value);
 		return this;
+	}
+	
+    @Override
+	public final DoubleVector append(Object value) {
+		if (value instanceof Double) {
+			return append((double) value);
+		}
+		throw new UnsupportedOperationException();
 	}
 	
 	@Override
 	public DoubleVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE);
-	    values.add((DoubleValue) value);
+	    values.add(value.getDouble());
 		return this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public DoubleVector clone() {
+		DoubleVector newVector = new DoubleVector();
+		newVector.schema = schema;
+		newVector.values = (List<Double>) ((ArrayList<Double>) values).clone();
+		return newVector;
 	}
 	
 	@Override
 	public DoubleVector fill(double value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new DoubleValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public double getDouble(int index) {
-		return values.get(index).getDouble();
-	}
-	
-	@Override
-	public DoubleValue getValue(int index) {
 		return values.get(index);
 	}
 	
 	@Override
+	public DoubleValue getValue(int index) {
+		return new DoubleValue(values.get(index));
+	}
+	
+	@Override
 	public DoubleVector setValue(int index, double value) {
-		values.set(index, new DoubleValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
@@ -109,7 +131,7 @@ public final class DoubleVector extends PrimitveVector {
 	
 	@Override
 	public Stream<DoubleValue> stream() {
-		return values.stream();
+		return values.stream().map(DoubleValue::new);
 	}
 	
 	@Override

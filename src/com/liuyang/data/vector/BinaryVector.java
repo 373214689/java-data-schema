@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,20 +19,24 @@ public final class BinaryVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<BinaryValue> values;
+	private List<byte[]> values;
 
 	public BinaryVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<BinaryValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<byte[]>(initSize));
 	}
 	
 	public BinaryVector(Schema schema) {
 		this(schema, 1);
 	}
 	
+	private BinaryVector() {
+
+	}
+
 	@Override
 	protected void finalize() {
 		values.clear();
@@ -41,10 +46,18 @@ public final class BinaryVector extends PrimitveVector {
 	
 	@Override
 	public BinaryVector append(byte[] value) {
-		values.add(new BinaryValue(value));
+		values.add(value);
 		return this;
 	}
 	
+    @Override
+	public final BinaryVector append(Object value) {
+		if (value instanceof byte[]) {
+			return append((byte[]) value);
+		}
+		throw new UnsupportedOperationException();
+	}
+    
 	/**
      * Check schema
      * @param index
@@ -64,21 +77,30 @@ public final class BinaryVector extends PrimitveVector {
 	public BinaryVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE);
-	    values.add((BinaryValue) value);
+	    values.add(value.getBinary());
 		return this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public BinaryVector clone() {
+		BinaryVector newVector = new BinaryVector();
+		newVector.schema = schema;
+		newVector.values = (List<byte[]>) ((ArrayList<byte[]>) values).clone();
+		return newVector;
 	}
 	
 	@Override
 	public BinaryVector fill(byte[] value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new BinaryValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public byte[] getBinary(int index) {
-		return values.get(index).getBinary();
+		return values.get(index);
 	}
 	
 	@Override
@@ -88,12 +110,12 @@ public final class BinaryVector extends PrimitveVector {
 	
 	@Override
 	public BinaryValue getValue(int index) {
-		return values.get(index);
+		return new BinaryValue(values.get(index));
 	}
 	
 	@Override
 	public BinaryVector setValue(int index, byte[] value) {
-		values.set(index, new BinaryValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
@@ -111,7 +133,7 @@ public final class BinaryVector extends PrimitveVector {
 	
 	@Override
 	public Stream<BinaryValue> stream() {
-		return values.stream();
+		return values.stream().map(BinaryValue::new);
 	}
 	
 	@Override

@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import com.liuyang.data.Row;
+
 
 /**
  * Data Schema Class
@@ -332,6 +334,20 @@ public final class Schema {
    /* public RowBuffer createRow() {
     	return null;
     }*/
+    
+    public boolean equals(Object anObject) {
+		if (anObject == this) return true;
+		if (anObject == null) return false;
+		if (anObject instanceof Schema) {
+			Schema other = (Schema) anObject;
+			if (other.getType() == Type.STRUCT && type == Type.STRUCT) {
+				return other.children.stream().filter(children::contains).count() == children.size();
+			} else {
+			    return other.type.equals(type) && other.name.equals(name);
+			}
+		}
+    	return false;
+    }
     
     /**
      * Get the maximum length of the type. Only used for char and varchar types.

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,7 +19,7 @@ public final class TextVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<TextValue> values;
+	private List<String> values;
 
 	
 	private TextVector() {
@@ -30,7 +31,7 @@ public final class TextVector extends PrimitveVector {
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE, Type.STRING);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<TextValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<String>(initSize));
 	}
 	
 	public TextVector(Schema schema) {
@@ -59,62 +60,71 @@ public final class TextVector extends PrimitveVector {
     		);
     }
     
+    @Override
+	public final TextVector append(Object value) {
+		if (value instanceof String) {
+			return append((String) value);
+		}
+		throw new UnsupportedOperationException();
+	}
+    
+	/*@Override
+	public final TextVector append(Object value) {
+		values.add(String.valueOf(value));
+		return this;
+	}*/
+    
 	@Override
 	public final TextVector append(String value) {
-		values.add(new TextValue(value));
+		values.add(value);
 		return this;
 	}
 	
 	@Override
 	public final TextVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
-		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE, Type.STRING);
-	    values.add((TextValue) value);
+		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE);
+	    values.add(value.getString());
 		return this;
 	}
 	
-	@Override
-	public final TextVector append(Object value) {
-		values.add(new TextValue(value));
-		return this;
-	}	
 	
 	@SuppressWarnings("unchecked")
 	@Override
 	public TextVector clone() {
 		TextVector newVector = new TextVector();
 		newVector.schema = schema;
-		newVector.values = (List<TextValue>) ((ArrayList<TextValue>) values).clone();
+		newVector.values = (List<String>) ((ArrayList<String>) values).clone();
 		return newVector;
 	}
 	
 	@Override
 	public TextVector fill(String value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new TextValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public String getString(int index) {
-		return values.get(index).getString();
-	}
-	
-	@Override
-	public TextValue getValue(int index) {
 		return values.get(index);
 	}
 	
 	@Override
+	public TextValue getValue(int index) {
+		return new TextValue(values.get(index));
+	}
+	
+	@Override
 	public TextVector setValue(int index, String value) {
-		values.set(index, new TextValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
 	@Override
 	public TextVector setValue(int index, Object value) {
-		values.set(index, new TextValue(value));
+		values.set(index, String.valueOf(value));
 		return this;
 	}
 	
@@ -135,15 +145,15 @@ public final class TextVector extends PrimitveVector {
 	
 	@Override
 	public Stream<TextValue> stream() {
-		return values.stream();
+		return values.stream().map(TextValue::new);
 	}
 	
 	@Override
 	public String toString() {
 		if (values.size() > 10) {
-			return "[" + String.join(", ", values.stream().map(TextValue::toString).limit(10).toArray(n -> new String[n])) + "...]";
+			return "[" + String.join(", ", values.stream().limit(10).toArray(n -> new String[n])) + "...]";
 		} else {
-		    return "[" + String.join(", ", values.stream().map(TextValue::toString).toArray(n -> new String[n])) + "]";
+		    return "[" + String.join(", ", values.stream().toArray(n -> new String[n])) + "]";
 		}
 		
 		

@@ -73,6 +73,26 @@ public final class IntValue extends PrimitveValue {
     }
     
     @Override
+    public final void modifyValue(Mode mode, int value) {
+        switch (mode) {
+        case INCREASE: this.value += value; break;
+        case SUBTRACT: this.value -= value; break;
+        case MULTIPLY: this.value *= value; break;
+        case DIVISION: this.value /= value; break;
+        case MODULO:   this.value %= value; break;
+        case EXPONENT: this.value ^= value; break;
+        case LOGARTHM: this.value = (int) (Math.log(this.value) / Math.log(value)); break;
+		default:
+			break;
+        }
+    }
+    
+    @Override
+    public final int length() {
+    	return 4;
+    }
+    
+    @Override
     public final void setValue(int value) {
     	this.value = value;
     }

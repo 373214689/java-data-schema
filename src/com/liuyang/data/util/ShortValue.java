@@ -77,6 +77,26 @@ public final class ShortValue extends PrimitveValue {
     }
     
     @Override
+    public final void modifyValue(Mode mode, short value) {
+        switch (mode) {
+        case INCREASE: this.value += value; break;
+        case SUBTRACT: this.value -= value; break;
+        case MULTIPLY: this.value *= value; break;
+        case DIVISION: this.value /= value; break;
+        case MODULO:   this.value %= value; break;
+        case EXPONENT: this.value ^= value; break;
+        case LOGARTHM: this.value = (short) (Math.log(this.value) / Math.log(value)); break;
+		default:
+			break;
+        }
+    }
+    
+    @Override
+    public final int length() {
+    	return 2;
+    }
+    
+    @Override
     public final void setValue(short value) {
     	this.value = value;
     }

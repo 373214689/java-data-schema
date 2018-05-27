@@ -5,11 +5,13 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import com.liuyang.data.udf.UDF;
 import com.liuyang.data.util.Schema;
 
 /**
@@ -19,7 +21,7 @@ import com.liuyang.data.util.Schema;
  * @version 1.0.0
  */
 public class DataSet {
-    private List<Row> rows;
+    private List<Object[]> rows;
     private Schema schema;
     
     private int limit = 20; // default limit number
@@ -39,7 +41,7 @@ public class DataSet {
     	if (schema == null) 
     		throw new IllegalArgumentException("parameter schem can not be set null.");
     	this.schema = schema;
-    	this.rows = new ArrayList<Row>(initialCapacity);
+    	this.rows = Collections.synchronizedList(new ArrayList<Object[]>(initialCapacity));
     }
     
     /**
@@ -58,30 +60,38 @@ public class DataSet {
     }
     
     /**
-     * Create one row with specified schema.
-     * @param bAppend if true, initial default value for row element, otherwise set null for row element.
+     * Create one row with specified schema. but it not be add to datas;
      * @return get a empty row, see {@link Row}
      */
     public final Row createRow() {
     	Row retval = new Row(schema, true);
-    	rows.add(retval);
+    	return retval;
+    }
+    
+    /**
+     * Create one row with specified schema.
+     * @param bAppend if true, initial default value for row element, otherwise set null for row element.
+     * @return get a empty row, see {@link Row}
+     */
+    public final Row createRow(boolean bAppend) {
+    	Row retval = new Row(schema, true);
+    	if (bAppend) rows.add(retval.toArray());
     	return retval;
     }
     
     public final void add(Row row) {
-    	rows.add(row);
+    	rows.add(row.toArray());
     }
     
     public final Row get(int index) {
-    	return rows.get(index);
+    	Object[] datas = rows.get(index);
+    	Row retval = new Row(schema, false);
+    	return retval.fill(datas);
     }
     
     public final Row del(int index) {
-    	return rows.remove(index);
-    }
-    
-    public final boolean del(Row whichRow) {
-    	return rows.remove(whichRow);
+    	Object[] datas = rows.remove(index);
+    	return new Row(schema, false).fill(datas);
     }
     
     public final DataSet limit(int limit) {
@@ -103,7 +113,7 @@ public class DataSet {
     		BufferedReader br;
     		try {
 				br = new BufferedReader(new FileReader(path));
-				br.lines().map(mapper).forEach(e -> {if (bAppend) add(e);});
+				br.lines().parallel().map(mapper).forEach(e -> {if (bAppend) add(e);});
 				br.close();
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
@@ -140,7 +150,9 @@ public class DataSet {
     	if ("*".equals(fieldNames[0])) return this;
     	DataSet retval = new DataSet();
     	retval.schema = schema.select(fieldNames);
-    	retval.rows = new ArrayList<Row>(size());
+    	retval.rows = new ArrayList<Object[]>(size());
+    	System.out.println("dataset select schema" + retval.schema);
+    	//stream().map(e -> e.select(retval.schema)).forEach(retval::add);
     	stream().map(e -> e.select(retval.schema)).forEach(retval::add);
     	return retval;
     }
@@ -154,7 +166,9 @@ public class DataSet {
     }
     
     public Stream<Row> stream() {
-    	return rows.stream();
+    	//Row row = createRow();
+    	//return UDF.range(0, rows.size(), 1, true).mapToObj(rows::get).map(createRow()::fill);
+    	return rows.stream().map(createRow()::fill);
     }
     
     @Override
@@ -168,7 +182,7 @@ public class DataSet {
      * the storage of an <tt>DataSet</tt> instance.
      */
     public void trimToSize() {
-        ((ArrayList<Row>) rows).trimToSize(); 
+        //((ArrayList<Object[]>) rows).trimToSize(); 
     }
 
 }

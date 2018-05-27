@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,20 +19,24 @@ public final class LongVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<LongValue> values;
+	private List<Long> values;
 
 	public LongVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE, Type.BIGINT);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<LongValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<Long>(initSize));
 	}
 	
 	public LongVector(Schema schema) {
 		this(schema, 1);
 	}
 	
+	private LongVector() {
+		
+	}
+
 	@Override
 	protected final void finalize() {
 		values.clear();
@@ -56,40 +61,57 @@ public final class LongVector extends PrimitveVector {
     
 	@Override
 	public final LongVector append(long value) {
-		values.add(new LongValue(value));
+		values.add(value);
 		return this;
+	}
+	
+    @Override
+	public final LongVector append(Object value) {
+		if (value instanceof Long) {
+			return append((long) value);
+		}
+		throw new UnsupportedOperationException();
 	}
 	
 	@Override
 	public final LongVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE, Type.BIGINT);
-	    values.add((LongValue) value);
+	    values.add(value.getLong());
 		return this;
 	}
 	
 	
+	@SuppressWarnings("unchecked")
+	@Override
+	public LongVector clone() {
+		LongVector newVector = new LongVector();
+		newVector.schema = schema;
+		newVector.values = (List<Long>) ((ArrayList<Long>) values).clone();
+		return newVector;
+	}
+	
 	@Override
 	public final LongVector fill(long value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new LongValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public final long getLong(int index) {
-		return values.get(index).getLong();
-	}
-	
-	@Override
-	public final LongValue getValue(int index) {
 		return values.get(index);
 	}
 	
 	@Override
+	public final LongValue getValue(int index) {
+		return new LongValue(values.get(index));
+	}
+	
+	@Override
 	public final LongVector setValue(int index, long value) {
-		values.set(index, new LongValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
@@ -110,7 +132,7 @@ public final class LongVector extends PrimitveVector {
 	
 	@Override
 	public Stream<LongValue> stream() {
-		return values.stream();
+		return values.stream().map(LongValue::new);
 	}
 	
 	@Override

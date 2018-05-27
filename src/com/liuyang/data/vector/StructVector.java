@@ -4,8 +4,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import com.liuyang.data.Row;
 import com.liuyang.data.udf.UDF;
@@ -32,6 +36,8 @@ public final class StructVector extends PrimitveVector {
 	private final static Type DEFAULT_VECTOR_TYPE = Type.STRUCT;
 	
 	private Schema schema;
+	
+	private Map<Row, StructVector> partitions;
 	
 	private List<PrimitveVector> values;
 	
@@ -64,7 +70,7 @@ public final class StructVector extends PrimitveVector {
 				append(new TextVector(children, initialCapacity)); break;
 			}
 		}
-		System.out.println("StructVector: size=" + values.size());
+		//System.out.println("StructVector: size=" + values.size());
 	}
 	
 	public StructVector(Schema schema) {
@@ -85,39 +91,45 @@ public final class StructVector extends PrimitveVector {
 	public final StructVector appendRow(Row row) {
 		if (row.schema() != schema) return this;
 		for(int i = 0; i < values.size(); i++) {
-			values.get(i).append(row.get(i));
+			values.get(i).append(row.get(i).getValue());
 		}
 		return this;
 	}
 	
-	public Row createRow() {
+	public Row createRow(boolean bAppend) {
 		Row retval = new Row(schema);
-		for(int i = 0; i < values.size(); i++) {
-			PrimitveValue value = null;
-			switch (schema.getType(i)) {
-			case BINARY:
-				value = new BinaryValue() ; break;
-			case DOUBLE:
-				value = new BooleanValue(); break;
-			case FLOAT:
-				value = new FloatValue(); break;
-			case INT:
-			case INTEGER:
-				value = new IntValue(); break;
-			case BIGINT:
-			case LONG:
-				value = new LongValue(); break;
-			case SHORT:
-			case SMALLINT:
-				value = new ShortValue(); break;
-			case STRING:
-			default:
-				value = new TextValue(); break;
+		if (bAppend) {
+			for(int i = 0; i < values.size(); i++) {
+				PrimitveValue value = null;
+				switch (schema.getType(i)) {
+				case BINARY:
+					value = new BinaryValue() ; break;
+				case DOUBLE:
+					value = new BooleanValue(); break;
+				case FLOAT:
+					value = new FloatValue(); break;
+				case INT:
+				case INTEGER:
+					value = new IntValue(); break;
+				case BIGINT:
+				case LONG:
+					value = new LongValue(); break;
+				case SHORT:
+				case SMALLINT:
+					value = new ShortValue(); break;
+				case STRING:
+				default:
+					value = new TextValue(); break;
+				}
+				values.get(i).append(value);
+				retval.set(i, value);
 			}
-			values.get(i).append(value);
-			retval.set(i, value);
 		}
 		return retval;
+	}
+	
+	public Row createRow() {
+		return createRow(false);
 	}
 	
 	@Override
@@ -134,7 +146,6 @@ public final class StructVector extends PrimitveVector {
 	    	sets.add(tmp.getValueAsRow(i));
 	    }
 
-	    
 	    StructVector retval = new StructVector(tmp.schema, sets.size());
 	    sets.forEach(row -> {
 	    	for(int i = 0; i < fields.size(); i++) {
@@ -165,8 +176,7 @@ public final class StructVector extends PrimitveVector {
 	public Row getValueAsRow(int index) {
 		Row retval = new Row(schema);
 		for(int i = 0; i < retval.size(); i++) {
-			PrimitveVector vector = values.get(i);
-			retval.set(i, vector.getValue(index));
+			retval.set(i, values.get(i).getValue(index));
 		}
 		return retval;
 	}
@@ -216,7 +226,13 @@ public final class StructVector extends PrimitveVector {
 
 	
 	public int size() {
-		return values.stream().mapToInt(PrimitveVector::size).max().getAsInt();
+		/*values.stream().forEach(e-> {
+			
+			System.out.println(e.getType() + " : " + e.size());
+		});*/
+		int retval = values.stream().mapToInt(e -> e.size()).max().getAsInt();
+		//System.out.println(retval);
+		return retval;
 	}
 	
 	public StructVector select(String... fieldNames) {
@@ -227,20 +243,65 @@ public final class StructVector extends PrimitveVector {
     	newVector.schema = schema.select(fieldNames);
     	newVector.values = new ArrayList<PrimitveVector>();
     	final List<String> fields = newVector.schema.getFieldNames();
-    	UDF.range(0, fields.size()).forEach(i -> {
-    		newVector.values.add(get(fields.get(i)));
-    	});
+    	UDF.range(0, values.size(), 1, true).mapToObj(values::get)
+    	    .filter(e -> fields.contains(e.schema().getFieldName()))
+    	    .forEach(newVector.values::add);
+    	//values.stream().filter(e -> fields.contains(e.schema().getFieldName())).forEach(newVector.values::add);
+    	/*range(0, fields.size()).mapToObj(this::get).forEach(vector -> {
+    		newVector.values.add(vector.clone());
+    	});*/
     	return newVector;
     	
+	}
+	
+	public StructVector groupby(String... fieldNames) {
+		StructVector tmp = distinct(fieldNames);
+		List<String> fields = schema().getFieldNames();
+		fields.removeAll(tmp.schema.getFieldNames());
+		String[] fieldArr = fields.stream().toArray(n -> new String[n]);
+		tmp.partitions = new HashMap<Row, StructVector>();
+		tmp.rows().forEach(row -> {
+			StructVector newVector = new StructVector();
+			newVector.schema = schema.select(fieldArr);
+			newVector.values = new ArrayList<PrimitveVector>();
+			rows().filter(row::containsAll)
+			      .map(e -> e.select(fieldArr))
+                  .forEach(e -> {
+                	  UDF.range(0, e.size(), 1, false)
+                	     .forEach(i -> {
+                	    	 newVector.values.get(i).append(e.get(i).getValue());
+                	     });
+                	  //e.stream().forEach(newVector.values.a);
+			      });
+			tmp.partitions.put(row, newVector);
+			
+		});
+		System.out.println(tmp.partitions);
+		return tmp;
+	}
+	
+	
+	
+	private IntStream range(int a, int b) {
+		int min = Math.min(a, b);
+		int max = Math.max(a, b);
+		int[] arr = new int[max - min];
+		for(int i = 0; i < max - min; i++) {
+			arr[i] = min + i;
+		}
+		return Arrays.stream(arr);
+	}
+	
+	public Stream<Row> rows() {
+		return range(0, size()).mapToObj(this::getValueAsRow);
 	}
 	
 	public String toString() {
 		int size = size();
 		StringBuffer retval = new StringBuffer();
 		retval.append("{");
-		for(int i = 0; i < size; i++) {
-			retval.append(getValueAsRow(i).toString() + "\r\n");
-		}
+		
+		rows().forEach(row -> retval.append(row + "\r\n"));
 		retval.append("}");
 		return retval.toString();
 	}

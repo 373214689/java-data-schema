@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,20 +19,24 @@ public final class FloatVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<FloatValue> values;
+	private List<Float> values;
 
 	public FloatVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<FloatValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<Float>(initSize));
 	}
 	
 	public FloatVector(Schema schema) {
 		this(schema, 1);
 	}
 	
+	private FloatVector() {
+
+	}
+
 	@Override
 	protected void finalize() {
 		values.clear();
@@ -56,39 +61,56 @@ public final class FloatVector extends PrimitveVector {
     
 	@Override
 	public FloatVector append(float value) {
-		values.add(new FloatValue(value));
+		values.add(value);
 		return this;
+	}
+	
+    @Override
+	public final FloatVector append(Object value) {
+		if (value instanceof Float) {
+			return append((float) value);
+		}
+		throw new UnsupportedOperationException();
 	}
 	
 	@Override
 	public FloatVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE);
-	    values.add((FloatValue) value);
+	    values.add(value.getFloat());
 		return this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public FloatVector clone() {
+		FloatVector newVector = new FloatVector();
+		newVector.schema = schema;
+		newVector.values = (List<Float>) ((ArrayList<Float>) values).clone();
+		return newVector;
 	}
 	
 	@Override
 	public FloatVector fill(float value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new FloatValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public float getFloat(int index) {
-		return values.get(index).getFloat();
-	}
-	
-	@Override
-	public FloatValue getValue(int index) {
 		return values.get(index);
 	}
 	
 	@Override
+	public FloatValue getValue(int index) {
+		return new FloatValue(values.get(index));
+	}
+	
+	@Override
 	public FloatVector setValue(int index, float value) {
-		values.set(index, new FloatValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
@@ -109,7 +131,7 @@ public final class FloatVector extends PrimitveVector {
 	
 	@Override
 	public Stream<FloatValue> stream() {
-		return values.stream();
+		return values.stream().map(FloatValue::new);
 	}
 	
 	@Override

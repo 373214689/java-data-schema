@@ -15,6 +15,18 @@ public abstract class PrimitveValue implements Comparable<PrimitveValue> {
 	/** data type */
 	private final static Type type = Type.PRIMITVE;
 	
+	public static enum Mode {
+		APPEND,
+		DELETE,
+		INCREASE,
+		SUBTRACT,
+		MULTIPLY,
+		DIVISION,
+		MODULO,
+		EXPONENT,
+		LOGARTHM
+	}
+	
 	public static PrimitveValue parse(Object o) {
 		if (o instanceof byte[]) {
 			return new BinaryValue((byte[]) o);
@@ -90,6 +102,22 @@ public abstract class PrimitveValue implements Comparable<PrimitveValue> {
 
 	public short getShort() {
 	    throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Get the length as this data used memery.
+	 * the array and string data length will changed with content.
+	 * <li>byte    : 1</li>
+	 * <li>boolean : 1</li>
+	 * <li>short   : 2</li>
+	 * <li>int     : 4</li>
+	 * <li>float   : 4</li>
+	 * <li>long    : 8</li>
+	 * <li>double  : 8</li>
+	 * @return The length of data in memery.
+	 */
+	public int length() {
+		throw new UnsupportedOperationException();
 	}
 	
 	/**
@@ -178,6 +206,90 @@ public abstract class PrimitveValue implements Comparable<PrimitveValue> {
 		throw new UnsupportedOperationException();
 	}
 	
+	/**
+	 * Modify boolean data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 * @deprecated {@code modifyValue(Mode, boolean)} not implemented.
+	 */
+	@Deprecated
+	public void modifyValue(Mode mode, boolean value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify byte array data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 * @deprecated {@code modifyValue(Mode, byte[])} not implemented.
+	 */
+	@Deprecated
+	public void modifyValue(Mode mode, byte[] value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify double data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 */
+	public void modifyValue(Mode mode, double value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify float data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 */
+	public void modifyValue(Mode mode, float value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify int data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 */
+	public void modifyValue(Mode mode, int value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 */
+	public void modifyValue(Mode mode, long value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 */
+	public void modifyValue(Mode mode, short value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Modify data with the specified mode.
+	 * @param mode 
+	 * @param value
+	 * @deprecated {@code modifyValue(Mode, byte[])} not implemented.
+	 */
+	@Deprecated
+	public void modifyValue(Mode mode, String value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	
+	/**
+	 * Write data to the specified output stream.
+	 * @param o the specified outputstream.
+	 * @throws IOException
+	 */
 	abstract public void writeValue(OutputStream o) throws IOException;
 	//abstract public void writeValue(RecordConsumer recordConsumer);
 }

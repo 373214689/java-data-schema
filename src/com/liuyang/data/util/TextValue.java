@@ -44,6 +44,8 @@ public final class TextValue extends PrimitveValue{
 		if (anObject == this) return true;
 		if (anObject == null) return false;
 		if (anObject instanceof TextValue) {
+			TextValue other = (TextValue) anObject;
+			if (value == other.value) return true;
 			return value.equals(((TextValue) anObject).value);
 		}
 		return false;
@@ -66,7 +68,12 @@ public final class TextValue extends PrimitveValue{
 	
     @Override
     public final int hashCode() {
-    	return value.hashCode();
+    	return (value == null) ? 0 : value.hashCode();
+    }
+    
+    @Override
+    public final int length() {
+    	return value.getBytes().length;
     }
 
     @Override

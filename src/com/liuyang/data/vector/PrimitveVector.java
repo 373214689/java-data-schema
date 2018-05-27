@@ -92,18 +92,6 @@ public abstract class PrimitveVector implements Comparable<PrimitveVector> {
 	}
 	
 	/**
-	 * Append a object value to vector.
-	 * @param value the {@code Object} value
-	 * @return get the pointer of this vector
-	 * 
-	 * @throws UnsupportedOperationException 
-     *         if the <tt>append</tt> operation is not supported by this vector
-	 */
-	public PrimitveVector append(Object value) {
-		throw new UnsupportedOperationException();
-	}
-	
-	/**
 	 * Append a short value to last of vector.
 	 * @param value the value of {@link Short}
 	 * @return get the pointer of this vector
@@ -149,6 +137,35 @@ public abstract class PrimitveVector implements Comparable<PrimitveVector> {
      *         if the <tt>append</tt> operation is not supported by this vector
 	 */
 	public PrimitveVector append(PrimitveVector value) {
+		throw new UnsupportedOperationException();
+	}
+	
+	/**
+	 * Append a object value to vector.
+	 * @param value the {@code Object} value
+	 * @return get the pointer of this vector
+	 * 
+	 * @throws UnsupportedOperationException 
+     *         if the <tt>append</tt> operation is not supported by this vector
+	 */
+	public PrimitveVector append(Object value) {
+		if (value instanceof byte[]) {
+			return append((byte[]) value);
+		} else if (value instanceof Boolean) {
+			return append((boolean) value);
+		} else if (value instanceof Double) {
+			return append((double) value);
+		} else if (value instanceof Float) {
+			return append((float) value);
+		} else if (value instanceof Integer) {
+			return append((int) value);
+		} else if (value instanceof Long) {
+			return append((long) value);
+		} else if (value instanceof Short) {
+			return append((short) value);
+		} else if (value instanceof String) {
+			return append((String) value);
+		}
 		throw new UnsupportedOperationException();
 	}
 	
@@ -559,7 +576,6 @@ public abstract class PrimitveVector implements Comparable<PrimitveVector> {
 	public Stream<? extends PrimitveValue> stream() {
 		throw new UnsupportedOperationException();
 	}
-	
 	
 	public PrimitveVector updateValue(int index, boolean value) {
 		throw new UnsupportedOperationException();

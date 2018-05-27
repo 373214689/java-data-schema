@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,20 +19,24 @@ public final class BooleanVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<BooleanValue> values;
+	private List<Boolean> values;
 
 	public BooleanVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE, Type.BOOL);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<BooleanValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<Boolean>(initSize));
 	}
 	
 	public BooleanVector(Schema schema) {
 		this(schema, 1);
 	}
 	
+	private BooleanVector() {
+
+	}
+
 	protected void finalize() {
 		values.clear();
 		schema = null;
@@ -55,29 +60,46 @@ public final class BooleanVector extends PrimitveVector {
 	
 	@Override
 	public BooleanVector append(boolean value) {
-		values.add(new BooleanValue(value));
+		values.add(value);
 		return this;
+	}
+	
+    @Override
+	public final BooleanVector append(Object value) {
+		if (value instanceof Boolean) {
+			return append((boolean) value);
+		}
+		throw new UnsupportedOperationException();
 	}
 	
 	@Override
 	public BooleanVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE, Type.BOOL);
-	    values.add((BooleanValue) value);
+	    values.add(value.getBoolean());
 		return this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public BooleanVector clone() {
+		BooleanVector newVector = new BooleanVector();
+		newVector.schema = schema;
+		newVector.values = (List<Boolean>) ((ArrayList<Boolean>) values).clone();
+		return newVector;
 	}
 	
 	@Override
 	public BooleanVector fill(boolean value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new BooleanValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public boolean getBoolean(int index) {
-		return values.get(index).getBoolean();
+		return values.get(index);
 	}
 	
 	@Override
@@ -87,17 +109,15 @@ public final class BooleanVector extends PrimitveVector {
 	
 	@Override
 	public BooleanValue getValue(int index) {
-		return values.get(index);
+		return new BooleanValue(values.get(index));
 	}
 	
 	@Override
 	public BooleanVector setValue(int index, boolean value) {
-		values.set(index, new BooleanValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
-
-
 	@Override
 	public int size() {
 		return values.size();
@@ -110,7 +130,7 @@ public final class BooleanVector extends PrimitveVector {
 	
 	@Override
 	public Stream<BooleanValue> stream() {
-		return values.stream();
+		return values.stream().map(BooleanValue::new);
 	}
 	
 	@Override

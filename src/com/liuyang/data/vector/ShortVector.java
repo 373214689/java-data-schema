@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,14 +19,19 @@ public final class ShortVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<ShortValue> values;
+	private List<Short> values;
 
+	
+	private ShortVector() {
+
+	}
+	
 	public ShortVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE, Type.SMALLINT);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<ShortValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<Short>(initSize));
 	}
 	
 	public ShortVector(Schema schema) {
@@ -56,39 +62,56 @@ public final class ShortVector extends PrimitveVector {
     
 	@Override
 	public final ShortVector append(short value) {
-		values.add(new ShortValue(value));
+		values.add(value);
 		return this;
+	}
+	
+    @Override
+	public final ShortVector append(Object value) {
+		if (value instanceof Short) {
+			return append((short) value);
+		}
+		throw new UnsupportedOperationException();
 	}
 	
 	@Override
 	public final ShortVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE, Type.SMALLINT);
-	    values.add((ShortValue) value);
+	    values.add(value.getShort());
 		return this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public ShortVector clone() {
+		ShortVector newVector = new ShortVector();
+		newVector.schema = schema;
+		newVector.values = (List<Short>) ((ArrayList<Short>) values).clone();
+		return newVector;
 	}
 	
 	@Override
 	public final ShortVector fill(short value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new ShortValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
 	public short getShort(int index) {
-		return values.get(index).getShort();
+		return values.get(index);
 	}
 	
 	@Override
 	public ShortValue getValue(int index) {
-		return values.get(index);
+		return new ShortValue(values.get(index));
 	}
 
 	@Override
 	public ShortVector setValue(int index, short value) {
-		values.set(index, new ShortValue(value));
+		values.set(index, value);
 		return this;
 	}
 	
@@ -109,7 +132,7 @@ public final class ShortVector extends PrimitveVector {
 	
 	@Override
 	public Stream<ShortValue> stream() {
-		return values.stream();
+		return values.stream().map(ShortValue::new);
 	}
 	
 	@Override

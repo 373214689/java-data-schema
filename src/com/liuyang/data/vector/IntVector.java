@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,20 +19,24 @@ public final class IntVector extends PrimitveVector {
 	
 	private Schema schema;
 	
-	private List<IntValue> values;
+	private List<Integer> values;
 
 	public IntVector(Schema schema, int initSize) {
 		// 如果传入的Schema.type与Vector的type不匹配, 则抛出无效参数异常
 		schemaCheck(schema.getType(), DEFAULT_VECTOR_TYPE, Type.INT);
 		// 初始化
 		this.schema = schema;
-		this.values = new ArrayList<IntValue>(initSize);
+		this.values = Collections.synchronizedList(new ArrayList<Integer>(initSize));
 	}
 	
 	public IntVector(Schema schema) {
 		this(schema, 1);
 	}
 	
+	private IntVector() {
+		
+	}
+
 	@Override
 	protected final void finalize() {
 		values.clear();
@@ -56,41 +61,57 @@ public final class IntVector extends PrimitveVector {
     
 	@Override
 	public final IntVector append(int value) {
-		values.add(new IntValue(value));
+		values.add(value);
 		return this;
+	}
+	
+    @Override
+	public final IntVector append(Object value) {
+		if (value instanceof Integer) {
+			return append((int) value);
+		}
+		throw new UnsupportedOperationException();
 	}
 	
 	@Override
 	public final IntVector append(PrimitveValue value) {
 		if (value == null) throw new NullPointerException();
 		schemaCheck(value.getType(), DEFAULT_VECTOR_TYPE, Type.INT);
-	    values.add((IntValue) value);
+	    values.add(value.getInteger());
 		return this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public IntVector clone() {
+		IntVector newVector = new IntVector();
+		newVector.schema = schema;
+		newVector.values = (List<Integer>) ((ArrayList<Integer>) values).clone();
+		return newVector;
 	}
 	
 	@Override
 	public final IntVector fill(int value) {
 		for(int i = 0; i < values.size(); i++) {
-			values.set(i, new IntValue(value));
+			values.set(i, value);
 		}
 		return this;
 	}
 	
 	@Override
-	public final String getString(int index) {
-		return values.get(index).getString();
-	}
-	
-
-	@Override
-	public final IntVector setValue(int index, int value) {
-		values.set(index, new IntValue(value));
-		return this;
+	public final int getInteger(int index) {
+		return values.get(index);
 	}
 	
 	@Override
 	public final IntValue getValue(int index) {
-		return values.get(index);
+		return new IntValue(values.get(index));
+	}
+	
+	@Override
+	public final IntVector setValue(int index, int value) {
+		values.set(index, value);
+		return this;
 	}
 	
 	@Override
@@ -110,7 +131,7 @@ public final class IntVector extends PrimitveVector {
 	
 	@Override
 	public Stream<IntValue> stream() {
-		return values.stream();
+		return values.stream().map(IntValue::new);
 	}
 	
 	@Override

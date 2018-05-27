@@ -69,6 +69,16 @@ public final class BooleanValue extends PrimitveValue {
     }
     
     @Override
+    public final int length() {
+    	return 1;
+    }
+    
+    @Override
+    public final void setValue(boolean value) {
+    	this.value = value;
+    }
+    
+    @Override
     public String toString() {
       return String.valueOf(value);
     }
